@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="description" content="Tetris Geográfico - Jogo educativo sobre Estrutura Etária da População">
+    <title>🧱 Tetris Geográfico – Estrutura Etária</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a1a;
+            --bg-secondary: #12122a;
+            --bg-card: rgba(255,255,255,0.04);
+            --accent-cyan: #00e5ff;
+            --accent-magenta: #e040fb;
+            --accent-gold: #ffd740;
+            --accent-green: #69f0ae;
+            --accent-red: #ff5252;
+            --accent-orange: #ffab40;
+            --text-primary: #eee;
+            --text-muted: #8888aa;
+            --glass: rgba(255,255,255,0.06);
+            --glass-border: rgba(255,255,255,0.1);
+            --radius: 14px;
+            --shadow-glow-cyan: 0 0 30px rgba(0,229,255,0.25);
+            --shadow-glow-gold: 0 0 40px rgba(255,215,64,0.35);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        html, body {
+            height: 100%; overflow: hidden;
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background:
+                radial-gradient(ellipse at 20% 0%, rgba(0,229,255,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, rgba(224,64,251,0.06) 0%, transparent 50%);
+            pointer-events: none; z-index: 0;
+        }
+
+        /* ─── GAME LAYOUT ─── */
+        #game-wrapper {
+            position: relative; z-index: 1;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100vh; width: 100vw;
+            padding: 8px;
+        }
+
+        #top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; max-width: 360px;
+            padding: 6px 4px; margin-bottom: 6px;
+        }
+
+        .stat-box {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 5px 12px;
+            text-align: center;
+            min-width: 70px;
+        }
+        .stat-box .label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-box .value { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
+        .stat-box .value.score-val { color: var(--accent-cyan); }
+        .stat-box .value.level-val { color: var(--accent-magenta); }
+        .stat-box .value.lines-val { color: var(--accent-green); }
+
+        #chest-indicator {
+            display: flex; align-items: center; gap: 4px;
+            background: linear-gradient(135deg, rgba(255,215,64,0.15), rgba(255,171,64,0.1));
+            border: 1px solid rgba(255,215,64,0.3);
+            border-radius: 10px; padding: 5px 10px;
+            font-size: 14px;
+        }
+        #chest-indicator .chest-count { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--accent-gold); }
+
+        #game-area {
+            display: flex; gap: 8px; align-items: flex-start;
+            max-width: 360px; width: 100%;
+        }
+
+        #canvas-container {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-glow-cyan), 0 8px 32px rgba(0,0,0,0.5);
+            border: 2px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+
+        #game-canvas {
+            display: block;
+            background: var(--bg-secondary);
+        }
+
+        #side-panel {
+            display: flex; flex-direction: column; gap: 6px;
+            flex: 1;
+        }
+
+        .side-box {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 8px;
+            text-align: center;
+        }
+        .side-box .label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+
+        #next-canvas { display: block; margin: 0 auto; }
+
+        #progress-bar-container {
+            width: 100%; height: 6px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 3px; overflow: hidden;
+            margin-top: 4px;
+        }
+        #progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+            border-radius: 3px;
+            transition: width 0.4s ease;
+            width: 0%;
+        }
+
+        /* ─── TOUCH CONTROLS ─── */
+        #touch-controls {
+            display: flex; justify-content: center; gap: 8px;
+            margin-top: 8px; width: 100%; max-width: 360px;
+        }
+
+        .ctrl-btn {
+            flex: 1;
+            height: 54px;
+            border: none;
+            border-radius: 12px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            font-size: 22px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .ctrl-btn:active {
+            background: rgba(0,229,255,0.15);
+            border-color: var(--accent-cyan);
+            transform: scale(0.94);
+        }
+        .ctrl-btn.drop-btn {
+            background: linear-gradient(135deg, rgba(0,229,255,0.12), rgba(224,64,251,0.08));
+            border-color: rgba(0,229,255,0.3);
+        }
+        .ctrl-btn.drop-btn:active {
+            background: linear-gradient(135deg, rgba(0,229,255,0.3), rgba(224,64,251,0.2));
+        }
+
+        /* ─── QUIZ OVERLAY ─── */
+        #quiz-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(5,5,20,0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.4s ease;
+        }
+        #quiz-overlay.active { display: flex; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(0,229,255,0.3); }
+            50% { box-shadow: 0 0 40px rgba(0,229,255,0.5); }
+        }
+
+        #quiz-card {
+            background: linear-gradient(145deg, rgba(18,18,42,0.95), rgba(10,10,26,0.98));
+            border: 1.5px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 24px 20px;
+            max-width: 380px; width: 100%;
+            animation: slideUp 0.5s ease;
+            box-shadow: 0 16px 64px rgba(0,0,0,0.6);
+        }
+
+        #quiz-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(224,64,251,0.1));
+            border: 1px solid rgba(0,229,255,0.3);
+            border-radius: 20px;
+            padding: 4px 14px;
+            font-size: 11px; font-weight: 600;
+            color: var(--accent-cyan);
+            margin-bottom: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        #quiz-question {
+            font-size: 15px; line-height: 1.55;
+            font-weight: 600;
+            margin-bottom: 18px;
+            color: #fff;
+        }
+
+        .quiz-option {
+            display: block; width: 100%;
+            background: var(--glass);
+            border: 1.5px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 13px 16px;
+            margin-bottom: 10px;
+            text-align: left;
+            font-size: 13.5px; line-height: 1.4;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .quiz-option:active {
+            transform: scale(0.97);
+        }
+        .quiz-option.correct {
+            background: rgba(105,240,174,0.15) !important;
+            border-color: var(--accent-green) !important;
+            color: var(--accent-green) !important;
+            animation: pulseGlow 1s ease infinite;
+            box-shadow: 0 0 20px rgba(105,240,174,0.2);
+        }
+        .quiz-option.wrong {
+            background: rgba(255,82,82,0.15) !important;
+            border-color: var(--accent-red) !important;
+            color: var(--accent-red) !important;
+        }
+
+        /* ─── CHEST ANIMATION ─── */
+        #chest-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(5,5,20,0.88);
+            backdrop-filter: blur(12px);
+            z-index: 200;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        #chest-overlay.active { display: flex; }
+
+        @keyframes chestBounce {
+            0% { transform: scale(0.3) rotate(-15deg); opacity: 0; }
+            50% { transform: scale(1.15) rotate(5deg); opacity: 1; }
+            70% { transform: scale(0.95) rotate(-2deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes sparkle {
+            0%, 100% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        @keyframes floatUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            30% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-40px); }
+        }
+
+        #chest-content {
+            text-align: center;
+            animation: chestBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #chest-emoji { font-size: 80px; display: block; margin-bottom: 16px; filter: drop-shadow(0 0 30px rgba(255,215,64,0.6)); }
+        #chest-title {
+            font-size: 22px; font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+        #chest-message { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
+        #chest-score-bonus {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 28px; font-weight: 700;
+            color: var(--accent-gold);
+            text-shadow: 0 0 20px rgba(255,215,64,0.5);
+            margin-bottom: 16px;
+        }
+
+        .sparkle-particle {
+            position: absolute;
+            width: 8px; height: 8px;
+            background: var(--accent-gold);
+            border-radius: 50%;
+            animation: sparkle 1.5s ease infinite;
+        }
+
+        #chest-continue-btn {
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
+            border: none; border-radius: 12px;
+            padding: 14px 32px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px; font-weight: 700;
+            color: #0a0a1a;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+        #chest-continue-btn:active { transform: scale(0.95); }
+
+        /* ─── START / GAME OVER SCREENS ─── */
+        #start-screen, #gameover-screen {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(5,5,20,0.95);
+            backdrop-filter: blur(20px);
+            z-index: 300;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 28px;
+            text-align: center;
+        }
+        #start-screen.active, #gameover-screen.active { display: flex; }
+
+        .screen-title {
+            font-size: 32px; font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+        .screen-subtitle {
+            font-size: 13px; color: var(--text-muted);
+            margin-bottom: 28px; line-height: 1.5;
+            max-width: 300px;
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            border: none; border-radius: 14px;
+            padding: 16px 40px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 17px; font-weight: 700;
+            color: #fff;
+            cursor: pointer;
+            box-shadow: var(--shadow-glow-cyan);
+            transition: transform 0.15s ease;
+            margin-bottom: 12px;
+        }
+        .start-btn:active { transform: scale(0.95); }
+
+        .game-over-score {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 48px; font-weight: 700;
+            color: var(--accent-cyan);
+            text-shadow: 0 0 30px rgba(0,229,255,0.4);
+            margin: 10px 0 4px;
+        }
+        .game-over-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; }
+
+        .rules-list {
+            text-align: left;
+            list-style: none;
+            margin-bottom: 24px;
+        }
+        .rules-list li {
+            font-size: 12.5px; color: var(--text-muted);
+            padding: 4px 0;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .rules-list li span.icon { font-size: 16px; }
+
+        /* ─── WRONG ANSWER OVERLAY ─── */
+        #wrong-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(5,5,20,0.9);
+            backdrop-filter: blur(12px);
+            z-index: 150;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        #wrong-overlay.active { display: flex; }
+
+        #wrong-card {
+            text-align: center;
+            animation: slideUp 0.5s ease;
+        }
+        #wrong-emoji { font-size: 64px; display: block; margin-bottom: 12px; }
+        #wrong-title { font-size: 20px; font-weight: 700; color: var(--accent-red); margin-bottom: 8px; }
+        #wrong-message { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; max-width: 300px; line-height: 1.5; }
+        #wrong-correct-answer {
+            font-size: 13px; color: var(--accent-green); 
+            background: rgba(105,240,174,0.1);
+            border: 1px solid rgba(105,240,174,0.2);
+            border-radius: 10px; padding: 10px 14px;
+            margin: 12px auto; max-width: 320px;
+            line-height: 1.4;
+        }
+        #wrong-continue-btn {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-magenta));
+            border: none; border-radius: 12px;
+            padding: 14px 32px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px; font-weight: 700;
+            color: #fff; cursor: pointer;
+            margin-top: 16px;
+            transition: transform 0.15s ease;
+        }
+        #wrong-continue-btn:active { transform: scale(0.95); }
+
+        /* ─── LINE CLEAR FLASH ─── */
+        @keyframes lineClearFlash {
+            0% { background: rgba(0,229,255,0.4); }
+            50% { background: rgba(224,64,251,0.3); }
+            100% { background: transparent; }
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-height: 700px) {
+            .ctrl-btn { height: 46px; font-size: 18px; }
+            .stat-box .value { font-size: 15px; }
+            .stat-box { padding: 3px 8px; }
+        }
+        @media (min-width: 500px) {
+            .ctrl-btn { max-width: 80px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══ START SCREEN ═══ -->
+<div id="start-screen" class="active">
+    <div class="screen-title">🧱 Tetris Geográfico</div>
+    <div style="font-size: 14px; color: var(--accent-cyan); font-weight: 600; margin-bottom: 4px;">Capítulo 14</div>
+    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">Estrutura Etária da População</div>
+    <ul class="rules-list">
+        <li><span class="icon">🧱</span> Jogue Tetris normalmente!</li>
+        <li><span class="icon">❓</span> A cada 3 linhas, uma pergunta aparece</li>
+        <li><span class="icon">✅</span> Acerte e ganhe um Baú Mágico</li>
+        <li><span class="icon">💰</span> O baú DOBRA sua pontuação!</li>
+        <li><span class="icon">❌</span> Errar não dobra, mas o jogo continua</li>
+    </ul>
+    <button class="start-btn" id="btn-start" onclick="startGame()">▶ JOGAR</button>
+</div>
+
+<!-- ═══ GAME WRAPPER ═══ -->
+<div id="game-wrapper">
+    <div id="top-bar">
+        <div class="stat-box">
+            <div class="label">Score</div>
+            <div class="value score-val" id="score-display">0</div>
+        </div>
+        <div id="chest-indicator">
+            <span>🎁</span>
+            <span class="chest-count" id="chest-count">0</span>
+        </div>
+        <div class="stat-box">
+            <div class="label">Nível</div>
+            <div class="value level-val" id="level-display">1</div>
+        </div>
+        <div class="stat-box">
+            <div class="label">Linhas</div>
+            <div class="value lines-val" id="lines-display">0</div>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <div id="canvas-container">
+            <canvas id="game-canvas"></canvas>
+        </div>
+        <div id="side-panel">
+            <div class="side-box">
+                <div class="label">Próxima</div>
+                <canvas id="next-canvas" width="80" height="80"></canvas>
+            </div>
+            <div class="side-box">
+                <div class="label">Perguntas</div>
+                <div id="progress-bar-container">
+                    <div id="progress-bar"></div>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                    <span id="lines-until-quiz">3</span> linhas p/ quiz
+                </div>
+            </div>
+            <div class="side-box">
+                <div class="label">Acertos</div>
+                <div style="font-size: 20px; font-weight: 700; color: var(--accent-green);" id="correct-count">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="touch-controls">
+        <button class="ctrl-btn" id="btn-left" aria-label="Mover esquerda">◀</button>
+        <button class="ctrl-btn" id="btn-rotate" aria-label="Rotacionar">🔄</button>
+        <button class="ctrl-btn drop-btn" id="btn-down" aria-label="Descer">▼</button>
+        <button class="ctrl-btn drop-btn" id="btn-harddrop" aria-label="Queda rápida">⏬</button>
+        <button class="ctrl-btn" id="btn-right" aria-label="Mover direita">▶</button>
+    </div>
+</div>
+
+<!-- ═══ QUIZ OVERLAY ═══ -->
+<div id="quiz-overlay">
+    <div id="quiz-card">
+        <div id="quiz-badge">📘 Quiz Geográfico</div>
+        <div id="quiz-question"></div>
+        <div id="quiz-options"></div>
+    </div>
+</div>
+
+<!-- ═══ CHEST OVERLAY ═══ -->
+<div id="chest-overlay">
+    <div id="chest-content">
+        <span id="chest-emoji">🎁</span>
+        <div id="chest-title">BAÚ MÁGICO!</div>
+        <div id="chest-message">Você acertou a pergunta!</div>
+        <div id="chest-score-bonus">×2</div>
+        <button id="chest-continue-btn" onclick="closeChest()">✨ CONTINUAR</button>
+    </div>
+</div>
+
+<!-- ═══ WRONG ANSWER OVERLAY ═══ -->
+<div id="wrong-overlay">
+    <div id="wrong-card">
+        <span id="wrong-emoji">😅</span>
+        <div id="wrong-title">Resposta Incorreta!</div>
+        <div id="wrong-message">Não foi dessa vez... A resposta certa era:</div>
+        <div id="wrong-correct-answer" id="wrong-answer-text"></div>
+        <button id="wrong-continue-btn" onclick="closeWrong()">Continuar Jogando</button>
+    </div>
+</div>
+
+<!-- ═══ GAME OVER SCREEN ═══ -->
+<div id="gameover-screen">
+    <div class="screen-title">Fim de Jogo!</div>
+    <div class="game-over-label">Pontuação Final</div>
+    <div class="game-over-score" id="final-score">0</div>
+    <div style="margin: 12px 0 20px;">
+        <div style="font-size: 12px; color: var(--text-muted);">
+            Linhas: <span id="final-lines" style="color: var(--accent-green);">0</span> &nbsp;|&nbsp;
+            Baús: <span id="final-chests" style="color: var(--accent-gold);">0</span> &nbsp;|&nbsp;
+            Acertos: <span id="final-correct" style="color: var(--accent-cyan);">0</span>
+        </div>
+    </div>
+    <button class="start-btn" onclick="startGame()">🔄 JOGAR NOVAMENTE</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  QUIZ QUESTIONS – Capítulo 14
+// ═══════════════════════════════════════════════
+const QUESTIONS = [
+    {
+        q: "O que a BASE da pirâmide etária representa?",
+        options: [
+            "Crianças e jovens (natalidade)",
+            "Adultos (mercado de trabalho)",
+            "Idosos (expectativa de vida)",
+            "Imigrantes (migração)"
+        ],
+        correct: 0
+    },
+    {
+        q: "O que o TOPO da pirâmide etária indica?",
+        options: [
+            "Taxa de natalidade",
+            "Força de trabalho",
+            "Expectativa de vida (idosos)",
+            "Taxa de migração"
+        ],
+        correct: 2
+    },
+    {
+        q: "Países DESENVOLVIDOS geralmente possuem:",
+        options: [
+            "Base larga e topo estreito",
+            "Base estreita e topo mais largo",
+            "Base e topo iguais",
+            "Apenas corpo largo"
+        ],
+        correct: 1
+    },
+    {
+        q: "Países SUBDESENVOLVIDOS possuem pirâmide com:",
+        options: [
+            "Base muito larga e topo inexpressivo",
+            "Base estreita e topo largo",
+            "Formato perfeitamente retangular",
+            "Corpo muito estreito e topo largo"
+        ],
+        correct: 0
+    },
+    {
+        q: "O que caracteriza a FASE INICIAL da transição demográfica?",
+        options: [
+            "Aumento da natalidade",
+            "Crescimento negativo",
+            "Queda da mortalidade com aumento populacional",
+            "Estabilização de natalidade e mortalidade"
+        ],
+        correct: 2
+    },
+    {
+        q: "O que acontece na FASE INTERMEDIÁRIA da transição demográfica?",
+        options: [
+            "Explosão da natalidade",
+            "Redução da taxa de natalidade",
+            "Aumento da mortalidade infantil",
+            "Eliminação da migração"
+        ],
+        correct: 1
+    },
+    {
+        q: "Qual fator contribuiu para a queda da natalidade no Brasil?",
+        options: [
+            "Aumento do desemprego rural",
+            "Mulher no mercado de trabalho e acesso a contraceptivos",
+            "Diminuição da expectativa de vida",
+            "Proibição de urbanização"
+        ],
+        correct: 1
+    },
+    {
+        q: "Quem é responsável pelo Censo Demográfico no Brasil?",
+        options: [
+            "ONU",
+            "Ministério da Educação",
+            "IBGE",
+            "Banco Central"
+        ],
+        correct: 2
+    },
+    {
+        q: "Qual foi a população estimada no Censo de 2022?",
+        options: [
+            "150 milhões",
+            "180 milhões",
+            "203 milhões",
+            "250 milhões"
+        ],
+        correct: 2
+    },
+    {
+        q: "O Brasil hoje tem pirâmide etária tendendo a formato:",
+        options: [
+            "Triangular com base larga",
+            "Invertida (topo maior que base)",
+            "Retangular (estreitamento da base, alargamento do corpo/topo)",
+            "Circular"
+        ],
+        correct: 2
+    },
+    {
+        q: "A população de idosos (60+) no Brasil foi de 4,3% (1950) para quanto em 2022?",
+        options: [
+            "8,5%",
+            "12,2%",
+            "15,85%",
+            "22,1%"
+        ],
+        correct: 2
+    },
+    {
+        q: "Qual é um dos maiores desafios do envelhecimento da população brasileira?",
+        options: [
+            "Construção de mais creches",
+            "Readequação do sistema de Previdência Social",
+            "Redução do número de hospitais",
+            "Incentivo à emigração de jovens"
+        ],
+        correct: 1
+    },
+    {
+        q: "O primeiro Censo brasileiro (1872) registrou cerca de:",
+        options: [
+            "5 milhões de habitantes",
+            "10 milhões de habitantes",
+            "20 milhões de habitantes",
+            "50 milhões de habitantes"
+        ],
+        correct: 1
+    },
+    {
+        q: "A taxa de natalidade em países em desenvolvimento como Brasil e China está:",
+        options: [
+            "Em forte crescimento",
+            "Estável e alta",
+            "Em redução (estreitamento da base)",
+            "Zerada"
+        ],
+        correct: 2
+    },
+    {
+        q: "Na FASE FINAL da transição demográfica, o que acontece?",
+        options: [
+            "Explosão populacional",
+            "Alta mortalidade e alta natalidade",
+            "Natalidade e mortalidade estabilizam em patamares baixos",
+            "Crescimento vegetativo altíssimo"
+        ],
+        correct: 2
+    },
+    {
+        q: "O corpo (meio) da pirâmide etária representa:",
+        options: [
+            "Crianças de 0 a 5 anos",
+            "A população adulta e o mercado de trabalho",
+            "Aposentados e idosos",
+            "A taxa de mortalidade infantil"
+        ],
+        correct: 1
+    },
+    {
+        q: "Qual percentual da população brasileira tinha até 14 anos em 2022?",
+        options: [
+            "41,8%",
+            "30,5%",
+            "25,1%",
+            "19,76%"
+        ],
+        correct: 3
+    },
+    {
+        q: "A transição demográfica começa geralmente com:",
+        options: [
+            "O aumento da natalidade nas cidades",
+            "A queda da mortalidade por melhorias na saúde e saneamento",
+            "A proibição de imigração",
+            "O aumento do analfabetismo"
+        ],
+        correct: 1
+    },
+    {
+        q: "O êxodo rural contribuiu para mudanças na estrutura etária do Brasil. O que é êxodo rural?",
+        options: [
+            "Migração do campo para as cidades",
+            "Migração das cidades para o campo",
+            "Migração internacional",
+            "Crescimento da população rural"
+        ],
+        correct: 0
+    },
+    {
+        q: "A população de 15 a 59 anos no Brasil em 2022 representava:",
+        options: [
+            "53,9%",
+            "58,2%",
+            "64,43%",
+            "70,1%"
+        ],
+        correct: 2
+    }
+];
+
+// ═══════════════════════════════════════════════
+//  TETRIS ENGINE
+// ═══════════════════════════════════════════════
+const COLS = 10;
+const ROWS = 20;
+let BLOCK_SIZE;
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const nextCanvas = document.getElementById('next-canvas');
+const nextCtx = nextCanvas.getContext('2d');
+
+// Tetromino shapes and colors
+const TETROMINOS = {
+    I: { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#00e5ff' },
+    O: { shape: [[1,1],[1,1]], color: '#ffd740' },
+    T: { shape: [[0,1,0],[1,1,1],[0,0,0]], color: '#e040fb' },
+    S: { shape: [[0,1,1],[1,1,0],[0,0,0]], color: '#69f0ae' },
+    Z: { shape: [[1,1,0],[0,1,1],[0,0,0]], color: '#ff5252' },
+    J: { shape: [[1,0,0],[1,1,1],[0,0,0]], color: '#448aff' },
+    L: { shape: [[0,0,1],[1,1,1],[0,0,0]], color: '#ffab40' }
+};
+const PIECE_NAMES = Object.keys(TETROMINOS);
+
+let board = [];
+let currentPiece, nextPiece;
+let score = 0, level = 1, linesCleared = 0, linesSinceLastQuiz = 0;
+let chestCount = 0, correctAnswers = 0;
+let gameRunning = false, gamePaused = false;
+let dropInterval, dropTimer;
+let usedQuestions = [];
+let animFrame;
+
+// ─── SIZING ───
+function calcSizes() {
+    const maxH = window.innerHeight;
+    const topBarH = 44;
+    const controlsH = 70;
+    const padding = 36;
+    const availH = maxH - topBarH - controlsH - padding;
+    BLOCK_SIZE = Math.floor(Math.min(availH / ROWS, (window.innerWidth * 0.62) / COLS));
+    BLOCK_SIZE = Math.max(BLOCK_SIZE, 14);
+    BLOCK_SIZE = Math.min(BLOCK_SIZE, 28);
+    canvas.width = COLS * BLOCK_SIZE;
+    canvas.height = ROWS * BLOCK_SIZE;
+}
+
+// ─── BOARD ───
+function createBoard() {
+    board = [];
+    for (let r = 0; r < ROWS; r++) {
+        board.push(new Array(COLS).fill(null));
+    }
+}
+
+// ─── PIECE ───
+function randomPiece() {
+    const name = PIECE_NAMES[Math.floor(Math.random() * PIECE_NAMES.length)];
+    const t = TETROMINOS[name];
+    return {
+        shape: t.shape.map(row => [...row]),
+        color: t.color,
+        name: name,
+        x: Math.floor(COLS / 2) - Math.ceil(t.shape[0].length / 2),
+        y: 0
+    };
+}
+
+function rotatePiece(shape) {
+    const N = shape.length;
+    const rotated = [];
+    for (let i = 0; i < N; i++) {
+        rotated.push([]);
+        for (let j = 0; j < N; j++) {
+            rotated[i][j] = shape[N - 1 - j][i];
+        }
+    }
+    return rotated;
+}
+
+function isValid(shape, offX, offY) {
+    for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[r].length; c++) {
+            if (!shape[r][c]) continue;
+            const newX = offX + c;
+            const newY = offY + r;
+            if (newX < 0 || newX >= COLS || newY >= ROWS) return false;
+            if (newY < 0) continue;
+            if (board[newY][newX]) return false;
+        }
+    }
+    return true;
+}
+
+function placePiece() {
+    for (let r = 0; r < currentPiece.shape.length; r++) {
+        for (let c = 0; c < currentPiece.shape[r].length; c++) {
+            if (!currentPiece.shape[r][c]) continue;
+            const y = currentPiece.y + r;
+            const x = currentPiece.x + c;
+            if (y < 0) { gameOver(); return; }
+            board[y][x] = currentPiece.color;
+        }
+    }
+    clearLines();
+    spawnPiece();
+}
+
+function spawnPiece() {
+    currentPiece = nextPiece || randomPiece();
+    nextPiece = randomPiece();
+    drawNextPiece();
+    if (!isValid(currentPiece.shape, currentPiece.x, currentPiece.y)) {
+        gameOver();
+    }
+}
+
+// ─── LINE CLEAR ───
+function clearLines() {
+    let cleared = 0;
+    for (let r = ROWS - 1; r >= 0; r--) {
+        if (board[r].every(cell => cell !== null)) {
+            board.splice(r, 1);
+            board.unshift(new Array(COLS).fill(null));
+            cleared++;
+            r++;
+        }
+    }
+    if (cleared > 0) {
+        const points = [0, 100, 300, 500, 800];
+        score += (points[cleared] || 800) * level;
+        linesCleared += cleared;
+        linesSinceLastQuiz += cleared;
+
+        level = Math.floor(linesCleared / 10) + 1;
+        dropInterval = Math.max(100, 800 - (level - 1) * 60);
+
+        updateUI();
+
+        // Check if quiz time
+        if (linesSinceLastQuiz >= 3) {
+            linesSinceLastQuiz = linesSinceLastQuiz % 3;
+            triggerQuiz();
+        }
+    }
+}
+
+// ─── MOVEMENT ───
+function moveLeft() {
+    if (!gameRunning || gamePaused) return;
+    if (isValid(currentPiece.shape, currentPiece.x - 1, currentPiece.y)) {
+        currentPiece.x--;
+    }
+}
+function moveRight() {
+    if (!gameRunning || gamePaused) return;
+    if (isValid(currentPiece.shape, currentPiece.x + 1, currentPiece.y)) {
+        currentPiece.x++;
+    }
+}
+function moveDown() {
+    if (!gameRunning || gamePaused) return;
+    if (isValid(currentPiece.shape, currentPiece.x, currentPiece.y + 1)) {
+        currentPiece.y++;
+        score += 1;
+    } else {
+        placePiece();
+    }
+}
+function hardDrop() {
+    if (!gameRunning || gamePaused) return;
+    while (isValid(currentPiece.shape, currentPiece.x, currentPiece.y + 1)) {
+        currentPiece.y++;
+        score += 2;
+    }
+    placePiece();
+    updateUI();
+}
+function rotate() {
+    if (!gameRunning || gamePaused) return;
+    const rotated = rotatePiece(currentPiece.shape);
+    // Try rotation, with wall kicks
+    const kicks = [0, 1, -1, 2, -2];
+    for (const kick of kicks) {
+        if (isValid(rotated, currentPiece.x + kick, currentPiece.y)) {
+            currentPiece.shape = rotated;
+            currentPiece.x += kick;
+            return;
+        }
+    }
+}
+
+// ─── DRAW ───
+function drawBlock(ctx, x, y, color, size) {
+    const s = size || BLOCK_SIZE;
+    const pad = 1;
+    // Main block
+    ctx.fillStyle = color;
+    ctx.fillRect(x * s + pad, y * s + pad, s - pad * 2, s - pad * 2);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(x * s + pad, y * s + pad, s - pad * 2, 3);
+    ctx.fillRect(x * s + pad, y * s + pad, 3, s - pad * 2);
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(x * s + pad, y * s + s - pad - 2, s - pad * 2, 2);
+    ctx.fillRect(x * s + s - pad - 2, y * s + pad, 2, s - pad * 2);
+}
+
+function drawGhostPiece() {
+    let ghostY = currentPiece.y;
+    while (isValid(currentPiece.shape, currentPiece.x, ghostY + 1)) {
+        ghostY++;
+    }
+    if (ghostY === currentPiece.y) return;
+    ctx.globalAlpha = 0.18;
+    for (let r = 0; r < currentPiece.shape.length; r++) {
+        for (let c = 0; c < currentPiece.shape[r].length; c++) {
+            if (!currentPiece.shape[r][c]) continue;
+            drawBlock(ctx, currentPiece.x + c, ghostY + r, currentPiece.color);
+        }
+    }
+    ctx.globalAlpha = 1;
+}
+
+function drawBoard() {
+    // Background
+    ctx.fillStyle = '#0d0d22';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 0.5;
+    for (let r = 0; r <= ROWS; r++) {
+        ctx.beginPath();
+        ctx.moveTo(0, r * BLOCK_SIZE);
+        ctx.lineTo(canvas.width, r * BLOCK_SIZE);
+        ctx.stroke();
+    }
+    for (let c = 0; c <= COLS; c++) {
+        ctx.beginPath();
+        ctx.moveTo(c * BLOCK_SIZE, 0);
+        ctx.lineTo(c * BLOCK_SIZE, canvas.height);
+        ctx.stroke();
+    }
+
+    // Placed blocks
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            if (board[r][c]) {
+                drawBlock(ctx, c, r, board[r][c]);
+            }
+        }
+    }
+
+    // Ghost
+    if (currentPiece) drawGhostPiece();
+
+    // Current piece
+    if (currentPiece) {
+        for (let r = 0; r < currentPiece.shape.length; r++) {
+            for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                if (!currentPiece.shape[r][c]) continue;
+                drawBlock(ctx, currentPiece.x + c, currentPiece.y + r, currentPiece.color);
+            }
+        }
+    }
+}
+
+function drawNextPiece() {
+    const s = 18;
+    nextCtx.fillStyle = 'transparent';
+    nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+    if (!nextPiece) return;
+    const shape = nextPiece.shape;
+    const offsetX = Math.floor((nextCanvas.width / s - shape[0].length) / 2);
+    const offsetY = Math.floor((nextCanvas.height / s - shape.length) / 2);
+    for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[r].length; c++) {
+            if (!shape[r][c]) continue;
+            drawBlock(nextCtx, offsetX + c, offsetY + r, nextPiece.color, s);
+        }
+    }
+}
+
+// ─── UI UPDATE ───
+function updateUI() {
+    document.getElementById('score-display').textContent = score.toLocaleString();
+    document.getElementById('level-display').textContent = level;
+    document.getElementById('lines-display').textContent = linesCleared;
+    document.getElementById('chest-count').textContent = chestCount;
+    document.getElementById('correct-count').textContent = correctAnswers;
+
+    const remain = 3 - linesSinceLastQuiz;
+    document.getElementById('lines-until-quiz').textContent = remain;
+    const pct = (linesSinceLastQuiz / 3) * 100;
+    document.getElementById('progress-bar').style.width = pct + '%';
+}
+
+// ─── GAME LOOP ───
+let lastTime = 0;
+let accumulated = 0;
+
+function gameLoop(time) {
+    if (!gameRunning) return;
+    animFrame = requestAnimationFrame(gameLoop);
+    if (gamePaused) return;
+
+    const delta = time - lastTime;
+    lastTime = time;
+    accumulated += delta;
+
+    if (accumulated > dropInterval) {
+        accumulated = 0;
+        moveDown();
+        updateUI();
+    }
+
+    drawBoard();
+}
+
+// ─── QUIZ ───
+function triggerQuiz() {
+    gamePaused = true;
+
+    // Pick a random unused question
+    if (usedQuestions.length >= QUESTIONS.length) {
+        usedQuestions = []; // reset if all used
+    }
+    let idx;
+    do {
+        idx = Math.floor(Math.random() * QUESTIONS.length);
+    } while (usedQuestions.includes(idx));
+    usedQuestions.push(idx);
+
+    const q = QUESTIONS[idx];
+    document.getElementById('quiz-question').textContent = q.q;
+
+    const optionsDiv = document.getElementById('quiz-options');
+    optionsDiv.innerHTML = '';
+
+    q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-option';
+        btn.textContent = opt;
+        btn.onclick = () => answerQuestion(btn, i, q, optionsDiv);
+        optionsDiv.appendChild(btn);
+    });
+
+    document.getElementById('quiz-overlay').classList.add('active');
+}
+
+function answerQuestion(btn, selected, question, container) {
+    // Disable all options
+    const allBtns = container.querySelectorAll('.quiz-option');
+    allBtns.forEach(b => { b.onclick = null; b.style.pointerEvents = 'none'; });
+
+    if (selected === question.correct) {
+        btn.classList.add('correct');
+        correctAnswers++;
+        setTimeout(() => {
+            document.getElementById('quiz-overlay').classList.remove('active');
+            showChest();
+        }, 800);
+    } else {
+        btn.classList.add('wrong');
+        allBtns[question.correct].classList.add('correct');
+        setTimeout(() => {
+            document.getElementById('quiz-overlay').classList.remove('active');
+            showWrongAnswer(question.options[question.correct]);
+        }, 1200);
+    }
+}
+
+function showChest() {
+    chestCount++;
+    const prevScore = score;
+    score = score * 2;
+    document.getElementById('chest-score-bonus').textContent = `${prevScore.toLocaleString()} → ${score.toLocaleString()}`;
+    document.getElementById('chest-overlay').classList.add('active');
+    updateUI();
+}
+
+function closeChest() {
+    document.getElementById('chest-overlay').classList.remove('active');
+    gamePaused = false;
+    updateUI();
+}
+
+function showWrongAnswer(correctText) {
+    document.getElementById('wrong-correct-answer').textContent = '✅ ' + correctText;
+    document.getElementById('wrong-overlay').classList.add('active');
+}
+
+function closeWrong() {
+    document.getElementById('wrong-overlay').classList.remove('active');
+    gamePaused = false;
+    updateUI();
+}
+
+// ─── GAME OVER ───
+function gameOver() {
+    gameRunning = false;
+    cancelAnimationFrame(animFrame);
+    document.getElementById('final-score').textContent = score.toLocaleString();
+    document.getElementById('final-lines').textContent = linesCleared;
+    document.getElementById('final-chests').textContent = chestCount;
+    document.getElementById('final-correct').textContent = correctAnswers;
+    document.getElementById('gameover-screen').classList.add('active');
+}
+
+// ─── START ───
+function startGame() {
+    document.getElementById('start-screen').classList.remove('active');
+    document.getElementById('gameover-screen').classList.remove('active');
+
+    calcSizes();
+    createBoard();
+
+    score = 0; level = 1; linesCleared = 0; linesSinceLastQuiz = 0;
+    chestCount = 0; correctAnswers = 0;
+    dropInterval = 800; accumulated = 0; lastTime = performance.now();
+    usedQuestions = [];
+    gamePaused = false;
+    gameRunning = true;
+
+    nextPiece = randomPiece();
+    spawnPiece();
+    updateUI();
+    animFrame = requestAnimationFrame(gameLoop);
+}
+
+// ─── CONTROLS ───
+// Touch
+document.getElementById('btn-left').addEventListener('touchstart', e => { e.preventDefault(); moveLeft(); });
+document.getElementById('btn-right').addEventListener('touchstart', e => { e.preventDefault(); moveRight(); });
+document.getElementById('btn-rotate').addEventListener('touchstart', e => { e.preventDefault(); rotate(); });
+document.getElementById('btn-down').addEventListener('touchstart', e => { e.preventDefault(); moveDown(); });
+document.getElementById('btn-harddrop').addEventListener('touchstart', e => { e.preventDefault(); hardDrop(); });
+
+// Mouse fallback
+document.getElementById('btn-left').addEventListener('mousedown', e => { e.preventDefault(); moveLeft(); });
+document.getElementById('btn-right').addEventListener('mousedown', e => { e.preventDefault(); moveRight(); });
+document.getElementById('btn-rotate').addEventListener('mousedown', e => { e.preventDefault(); rotate(); });
+document.getElementById('btn-down').addEventListener('mousedown', e => { e.preventDefault(); moveDown(); });
+document.getElementById('btn-harddrop').addEventListener('mousedown', e => { e.preventDefault(); hardDrop(); });
+
+// Hold-to-repeat for left/right/down
+let holdIntervals = {};
+function startHold(action, btnId) {
+    if (holdIntervals[btnId]) return;
+    holdIntervals[btnId] = setInterval(action, 90);
+}
+function stopHold(btnId) {
+    clearInterval(holdIntervals[btnId]);
+    delete holdIntervals[btnId];
+}
+
+['btn-left', 'btn-right', 'btn-down'].forEach(id => {
+    const action = id === 'btn-left' ? moveLeft : id === 'btn-right' ? moveRight : moveDown;
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', e => { e.preventDefault(); startHold(action, id); });
+    el.addEventListener('touchend', e => { e.preventDefault(); stopHold(id); });
+    el.addEventListener('touchcancel', e => { e.preventDefault(); stopHold(id); });
+    el.addEventListener('mousedown', e => { e.preventDefault(); startHold(action, id); });
+    el.addEventListener('mouseup', e => { e.preventDefault(); stopHold(id); });
+    el.addEventListener('mouseleave', e => { e.preventDefault(); stopHold(id); });
+});
+
+// Keyboard (for desktop testing)
+document.addEventListener('keydown', e => {
+    if (!gameRunning || gamePaused) return;
+    switch(e.key) {
+        case 'ArrowLeft': moveLeft(); break;
+        case 'ArrowRight': moveRight(); break;
+        case 'ArrowDown': moveDown(); break;
+        case 'ArrowUp': rotate(); break;
+        case ' ': e.preventDefault(); hardDrop(); break;
+    }
+});
+
+// ─── SWIPE GESTURES ───
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+    touchStartTime = Date.now();
+});
+canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (!gameRunning || gamePaused) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    const dt = Date.now() - touchStartTime;
+
+    if (Math.abs(dx) < 15 && Math.abs(dy) < 15 && dt < 250) {
+        rotate();
+        return;
+    }
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 30) moveRight();
+        else if (dx < -30) moveLeft();
+    } else {
+        if (dy > 40) hardDrop();
+    }
+});
+
+// Prevent scrolling
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+// Resize
+window.addEventListener('resize', () => {
+    if (gameRunning) {
+        calcSizes();
+    }
+});
+
+// Initial sizing
+calcSizes();
+</script>
+</body>
+</html>
